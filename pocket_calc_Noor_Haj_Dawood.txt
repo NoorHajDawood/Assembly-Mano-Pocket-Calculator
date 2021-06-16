@@ -1,0 +1,1124 @@
+/////////////////////////////////////	MAIN	/////////////////////////////////////
+// MAIN
+			LDA	structerStart	// print input structer to the user
+			BSA	Puts
+mainLoop,	LDA	StackStart		// main loop
+			STA	SPtr			// ask for Base (B/D/H), if given X then Terminate
+			LDA	indicStart
+			BSA	Puts
+			LDA	baseTXTptr
+			BSA	Puts
+			BSA	Getc
+			STA	mainBase
+			ADD	N_X
+			SZA
+			BUN	baseCheck
+			BUN	Terminate
+baseCheck,	LDA	CR				// check if base is legal
+			BSA	Putc
+			LDA	mainBase
+baseH,		ADD	bigH			// base is HEX, then input function = &getHEX
+			SZA					//					output divison array = &putHEX
+			BUN	baseB
+			LDA	getHEXptr
+			STA	getBase
+			LDA	Power16start
+			STA	putBase
+			BUN	input1
+baseB,		LDA	mainBase		// base is BIN, then input function = &getBIN
+			ADD	bigB			//					output divison array = &putBIN
+			SZA
+			BUN	baseD
+			LDA	getBINptr
+			STA	getBase
+			LDA	Power2start
+			STA	putBase
+			BUN	input1
+baseD,		LDA	mainBase		// base is DEC, then input function = &getDEC
+			ADD	bigD			//					output divison array = &putDEC
+			SZA
+			BUN	noBaseErr
+			LDA	getDECptr
+			STA	getBase
+			LDA	Power10start
+			STA	putBase
+			BUN	input1
+noBaseErr,	LDA	ErrorStart		// base is illegal, print a error message
+			BSA	Puts			//		then go to the beginning
+			LDA	noBasePtr
+			BSA	Puts
+			BUN	mainLoop
+input1,		LDA	putBase			// input number1 using the input function pointer
+			BSA	Push_AC			//	(number legallity check inside the input functions)
+			LDA	indicStart
+			BSA	Puts
+			LDA getBase
+			BSA	getSI
+			STA	Num1
+CheckOp,	BSA	Pop_AC			// input an operator
+			STA	OP
+			BSA	OpCheck			// check if operator is + - * /
+			SZA
+			BUN	input2
+			LDA	CR
+			BSA	Putc
+			LDA	ErrorStart		// illegal operator, print error and restart
+			BSA	Puts
+			LDA	OP
+			BSA	Putc
+			LDA	notOpStart
+			BSA	Puts
+			BUN	mainLoop
+input2,		STA	OP				// input number2
+			LDA	getBase
+			BSA	getSI
+			STA	Num2
+			BSA	Pop_AC			// number input ended, check if last key press was '='
+			CMA
+			INC
+			ADD	Equals
+			SZA
+			BUN	not=
+			BUN execOp
+not=,		LDA	Num2			// not '=', print error and restart
+			BUN	digError
+execOp,		LDA	OP				// execute the corresponding operator function
+execAdd,	ADD	Plus			// num1 + num2
+			SZA
+			BUN	execSub
+			LDA	Num1
+			ADD	Num2
+			STA	Result			// result = num1+num2
+            LDA Num1			// check for over/underflow
+            AND MSB_mask
+            STA MSB1
+            LDA Num2
+            AND MSB_mask
+            CMA
+            INC
+            ADD MSB1
+            SZA
+            BUN addResult
+            LDA Result
+            AND MSB_mask
+            CMA
+            INC
+            ADD MSB1
+            SZA
+            BUN ouf
+addResult,	LDA Result			// output the result
+            BSA	putSigned
+			BUN	execEnd
+execSub,	LDA	OP				// num1 - num2
+			ADD	Minus
+			SZA
+			BUN	execMult
+			LDA	Num2
+			CMA
+			INC
+			ADD	Num1
+			STA	Result			// result = num1 - num2
+            LDA Num1			// check for over/undeflow
+            AND MSB_mask
+            STA MSB1
+            LDA Num2
+            CMA
+            INC
+            AND MSB_mask
+            CMA
+            INC
+            ADD MSB1
+            SZA
+            BUN subResult
+            LDA Result
+            AND MSB_mask
+            CMA
+            INC
+            ADD MSB1
+            SZA
+            BUN ouf
+subResult,  LDA Result			// print result
+			BSA	putSigned
+			BUN	execEnd
+execMult,	LDA	Num1			// num1 * num2
+			BSA	Push_AC
+			LDA	Num2
+			BSA	Push_AC
+			LDA	OP
+			ADD	Mult
+			SZA
+			BUN	execDiv
+			BSA	calc_mult
+			STA	Result			// print result = num1*num2 
+			BSA	putSigned		//	(over/undeflow checked in mult function)
+			BUN	execEnd
+execDiv,	BSA	calc_div		// num1 / num2
+			BSA	Pop_AC			// over flow checked in div function
+			STA	Remainder		// remainder = num1 % num2
+			BSA	Pop_AC
+			STA	Result			// result = num1 / num2
+			BSA	putSigned
+			LDA	remainder
+			SZA
+			BUN	prntRem
+			BUN	execEnd
+prntRem,	LDA	putBase			//	print result , print (remainder) if needed
+			BSA	Push_AC
+			LDA	hex(
+			BSA	Putc
+			LDA	Remainder
+			BSA	putSigned
+			LDA	hex)
+			BSA	Putc
+execEnd,	LDA	CR				// go back to the start
+			BSA	Putc
+			BUN	mainLoop
+Terminate,	LDA	CR				// Terminate
+			BSA	Putc
+			LDA	byeStart
+			BSA	Puts
+			HLT
+//main data
+mainBase,	HEX	0
+getBase,	HEX	0
+putBase,	HEX	0
+OP,			HEX	0
+Num1,		HEX	0
+Num2,		HEX	0
+Result,		HEX	0
+Remainder,	HEX	0
+MSB_mask,   HEX 8000
+MSB1,       HEX 0
+MSB2,       HEX 0
+ErrorStart,	HEX	100	//"Error: "
+			ORG	100
+Error,		HEX 45  //E
+			HEX 72  //r
+			HEX 72  //r
+			HEX 6f  //o
+			HEX 72  //r
+			HEX 3a  //:
+Space,		HEX 20  // 
+			HEX	0
+div0Start,	HEX	110	//"Divison by 0!\r"
+			ORG	110
+divZero,	HEX 44  //D
+			HEX 69  //i
+			HEX 76  //v
+			HEX 69  //i
+			HEX 73  //s
+			HEX 69  //i
+			HEX 6f  //o
+			HEX 6e  //n
+			HEX 20  // 
+			HEX 62  //b
+			HEX 79  //y
+			HEX 20  // 
+			HEX 30  //0
+			HEX 21  //!
+			HEX d   //'CR'
+			HEX 0
+nDigStart,	HEX	130	//"is not a digit!\r"
+			ORG	130
+notDig,		HEX 69  //i
+			HEX 73  //s
+			HEX 20  // 
+			HEX 6e  //n
+			HEX 6f  //o
+			HEX 74  //t
+			HEX 20  // 
+			HEX 61  //a
+			HEX 20  // 
+			HEX 64  //d
+			HEX 69  //i
+			HEX 67  //g
+			HEX 69  //i
+			HEX 74  //t
+			HEX 21  //!
+			HEX d   //'CR'
+			HEX 0
+indicStart,	HEX	152	//"> "
+opStart,	HEX 150	//"Op> "
+			ORG	150
+opTXT,		HEX 4f  //O
+			HEX 70  //p
+indicator,	HEX 3e  //>
+            HEX 20  // 
+			HEX 0
+firstStart,	HEX	160	//"1st> "
+			ORG	160
+firstTXT,	HEX 31  //1
+			HEX 73  //s
+			HEX 74  //t
+			HEX 3e  //>
+			HEX 20  // 
+			HEX 0
+secondStart,HEX	170	//"2nd> "
+			ORG	170
+secondTXT,	HEX 32  //2
+			HEX 6e  //n
+			HEX 64  //d
+			HEX 3e  //>
+			HEX 20  // 
+			HEX 0
+Plus,		HEX	2b
+Minus,		HEX	2d
+Mult,		HEX	2a
+Div,		HEX	2f
+bigH,		HEX	-48
+bigB,		HEX	-42
+bigD,		HEX	-44
+bigA,		HEX	-41
+bigF,		HEX	-46
+hex0,		HEX	-30
+hex9,		HEX	-39
+Equals,		HEX	3d
+N_X,		HEX	-58
+hex(,		HEX 28  //(
+hex),		HEX 29  //)
+byeStart,	HEX	200
+			ORG	200
+bye,		HEX 42  //B
+			HEX 79  //y
+			HEX 65  //e
+			HEX 20  // 
+			HEX 5e  //^
+			HEX 5f  //_
+			HEX 5e  //^
+			HEX 0
+notOpStart,	HEX	210
+			ORG	210
+notOp,		HEX 20  // 
+			HEX 69  //i
+			HEX 73  //s
+			HEX 20  // 
+			HEX 6e  //n
+			HEX 6f  //o
+			HEX 74  //t
+			HEX 20  // 
+			HEX 61  //a
+			HEX 6e  //n
+			HEX 20  // 
+			HEX 6f  //o
+			HEX 70  //p
+			HEX 65  //e
+			HEX 72  //r
+			HEX 61  //a
+			HEX 74  //t
+			HEX 6f  //o
+			HEX 72  //r
+			HEX 21  //!
+			HEX d   //'CR'
+			HEX 0
+oufStart,   HEX 230
+            ORG 230
+ouFlow,     HEX 4f  //O
+            HEX 76  //v
+            HEX 65  //e
+            HEX 72  //r
+            HEX 2f  ///
+            HEX 55  //U
+            HEX 6e  //n
+            HEX 64  //d
+            HEX 65  //e
+            HEX 72  //r
+            HEX 66  //f
+            HEX 6c  //l
+            HEX 6f  //o
+            HEX 77  //w
+            HEX 21  //!
+            HEX d   //'CR'
+            HEX 0
+/////////////////////////////////////
+/////////////////////////////////////	STACK	/////////////////////////////////////
+// Data STACK
+Minus1, 	DEC -1
+SPtr, 		HEX 300
+StackStart,	HEX	300
+			ORG 300
+Stack, 		DEC 0
+			DEC 0
+			DEC 0
+			DEC 0
+			DEC 0
+StackEnd, 	DEC 0
+// Stack operations
+Pop_AC, 	HEX 0
+			LDA SPtr 		// SPtr--
+			CMA
+			INC
+			CMA
+			STA SPtr
+			LDA SPtr I		// AC = *SPtr
+			BUN Pop_AC I 	// return
+Push_AC, 	HEX 0
+			STA SPtr I 		// *SPtr = AC
+			ISZ SPtr 		// SPtr++
+			BUN Push_AC I 	// return
+/////////////////////////////////////
+/////////////////////////////////////	SUBROUTINES	/////////////////////////////////////
+//Check op					// return (op == '+') || (op == '-') || (op == '*') || (op == '/')
+OpCheck,	HEX	0
+			CMA
+			INC
+			STA	opTmp
+isAdd,		ADD	Plus
+			SZA
+			BUN	isSub
+			BUN	opReturn
+isSub,		LDA	opTmp
+			ADD	Minus
+			SZA
+			BUN	isMult
+			BUN	opReturn
+isMult,		LDA	opTmp
+			ADD	Mult
+			SZA
+			BUN	isDiv
+			BUN	opReturn
+isDiv,		LDA	opTmp
+			ADD	Div
+			SZA
+			BUN	opFail
+			BUN	opReturn
+opFail,		CLA
+			BUN	opCheckEnd
+opReturn,	LDA	opTmp
+opCheckEnd,	BUN	OpCheck I
+//check op DATA
+opTmp,		HEX	0
+/////////////////////////////////////
+/////////////////////////////////////
+//check 0 - 9				// return ('0' <= dig <= '9')
+check09,    HEX 0
+            STA checkDig
+check091,   ADD hex0
+            SNA             // skip if (dig - hex0 < 0) -> (dig < '0') == !(dig >= '0)
+            BUN check092
+            BUN not09
+check092,   LDA checkDig
+            ADD hex9        // skip if (dig - hex9 > 0) -> (dig > '9') == !(dig <= '9')
+            SPA
+            BUN is09
+not09,      CLA
+            BUN check09End
+is09,       LDA checkDig
+check09End, BUN check09 I
+//check09 data
+checkDig,   HEX 0
+/////////////////////////////////////
+/////////////////////////////////////
+//multiplication			// return num1*num2
+calc_mult,	HEX	0
+			CLA
+			STA	multSign	// sign = false
+			STA	multResult
+			BSA	Pop_AC
+			STA	mult2		// if(num2 < 0) { num2 = -num2;	sign = !sign}
+			SNA
+			BUN	mult1Pop
+			CMA
+			INC
+			STA	mult2
+			LDA	multSign
+			CMA
+			STA	multSign
+mult1Pop,	BSA	Pop_AC		// if(num1 < 0) { num1 = -num1;	sign = !sign}
+			STA	mult1
+			SNA
+			BUN	multSwap
+			CMA
+			INC
+			STA	mult1
+			LDA	multSign
+			CMA
+			STA	multSign
+multSwap,	LDA	mult2		// if(num1 < num2)	swap(&num1,&num2) 
+			CMA				// (so that mult loops for smaller bit length)
+			INC
+			ADD	mult1
+			SNA
+			BUN	multZero
+			LDA	mult2
+			STA	multTmp
+			LDA	mult1
+			STA	mult2
+			LDA	multTmp
+			STA	mult1
+multZero,	LDA	mult1
+			SPA
+			BUN multReturn
+			LDA	mult2
+			SPA
+			BUN	multReturn
+multLoop,	LDA	mult2		//	loop for each bit in num2
+			SZA
+			BUN	multBody
+			BUN	multEnd
+multBody,	CLE
+			CIR
+			STA	mult2
+			SZE
+			BUN	multAdd
+			BUN	multFI
+multAdd,	CLE				// multiply each bit of num2 by num1, like in table multiplication
+            LDA	multResult
+			ADD	mult1
+			SZE
+			BUN	ouf
+			STA	multResult
+multFI,		CLE
+			LDA	mult1
+			CIL
+			STA	mult1
+			LDA	mult2
+			SPA
+			BUN	multEnd
+			SZE
+			BUN	ouf
+			BUN	multLoop
+multEnd,	LDA	multSign	// if( sign == true)
+			SZA				// {
+			BUN	multNeg
+			BUN	multPos
+multNeg,	LDA	multResult	//		result = -result
+			CMA
+			INC
+			STA	multResult	//		check for over/underflow
+			SNA				//	(* had to check separately for negative incase of -(32768))
+			BUN	ouf
+			BUN	multReturn	// }
+multPos,	LDA	multResult	// check for overflow 
+			SPA				//	
+			BUN	ouf
+multReturn,	LDA	multResult	//	return result
+			BUN	calc_mult I	
+//mult data
+mult1,		DEC	0
+mult2,		DEC	0
+multSign,	DEC	0
+multResult,	DEC	0
+multTmp,	DEC	0
+/////////////////////////////////////
+/////////////////////////////////////
+//division
+calc_div,	HEX	0			// calc_div(dividend, divisor)
+			CLA				// {
+			STA	divSign		// 	sign = 0
+			STA	divQuo		// 	quotient = 0
+			STA	divRem		// 	remainder = 0
+			LDA	divHEX		//
+			STA	divIter		// 	iter = 0x8000
+			BSA	Pop_AC		//
+			STA	div2		// 	div2 = divisor
+			SZA				// 	if( divisor == 0 )
+			BUN	div2FI		//	{
+			BSA	Pop_AC	 	//		empty dividend from the stack
+			LDA	CR
+			BSA	Putc
+			LDA	ErrorStart	//		print Error
+			BSA	Puts		//
+			LDA	div0Start	//
+			BSA	Puts		//		goto mainLoop
+			BUN	mainLoop	//	}
+div2FI,		SNA				// 	if( divisor < 0 )
+			BUN	div1Pop		// 	{
+			CMA				//		div2 = -divisor
+			INC				//
+			STA	div2		//
+			LDA	divSign		//		sign = !sign
+			CMA				//	
+			STA	divSign		//
+div1Pop,	BSA	Pop_AC		// 	}
+			STA	div1		// 	div1 = dividend
+			SNA				// 	if( dividend < 0 )
+			BUN	divLoop		// 	{
+			CMA				//		div1 = -dividend
+			INC				//
+			STA	div1		//
+			LDA	divSign		//		sign = !sign
+			CMA				//
+			STA	divSign		// 	}
+divLoop,	LDA	divIter		//	While( (iter>>=1) != 0) 
+			SZA				//	{
+			BUN	divBody
+			BUN	divEnd		//
+divBody,	CLE				//
+			LDA	divRem		//		remainder <<= 1
+			CIL				//
+			STA	divRem		//
+			CLE				//
+			LDA	divQuo		//		quotient <<= 1
+			CIL				//
+			STA	divQuo		//
+			LDA	div1		//
+			AND	divIter		//
+			SZA				//
+			ISZ	divRem		//		remainder += ( (dividend & iter)!=0 )
+divCheck,	LDA	div2		//		if( remainder >= div2 )
+			CMA				//		{
+			INC				//			
+			ADD	divRem		//			
+			SNA				//
+			BUN	divThen		//
+			BUN	divFI		//
+divThen,	STA	divRem		//			remainder = remainder - div2
+			ISZ	divQuo		//			++quotient
+divFI,		CLE				//		}
+			LDA	divIter		//	{
+			CIR				//
+			STA	divIter		//
+			BUN	divLoop
+divEnd,		LDA	divSign		//	}
+			SZA				//
+			BUN	divNeg		//	if( sign != 0)
+			BUN	divReturn	//	{
+divNeg,		LDA	divQuo		//		quotient = -quotient
+			CMA				//	}
+			INC				//	
+			STA	divQuo		//	Push_AC ( quotient )
+divReturn,	LDA	divQuo		//
+			BSA	Push_AC		//
+			LDA	divRem		//	Push_AC	( remainder )
+			BSA	Push_AC		//
+			BUN	calc_div I	// }
+//div data
+div1,		DEC	0
+div2,		DEC	0
+divSign,	DEC	0
+divQuo,		DEC	0
+divRem,		DEC	0
+divIter,	HEX	0
+divHEX,		HEX	8000
+/////////////////////////////////////
+/////////////////////////////////////
+// void putc(char cc)
+Putc, 		HEX 0 			// void Putc ( char cc )
+Char_out, 	SKO 			// {
+			BUN Char_out 	// IF ( FGO == 1 )
+			OUT 			// OUTPUT ( cc )
+			BUN Putc I 		// }
+//char getc()
+Getc, 		HEX 0 			// void Getc ()
+Char_in, 	SKI 			// {
+			BUN	waitInput	//
+			BUN	getInput	//
+waitInput,	LDA	hex_		//	print a flashing '_' to indicate input is ready
+			BSA	Putc		//
+			LDA	backSpace	//
+			BSA	Putc		//
+			BUN Char_in 	// IF ( FGI == 1 )
+getInput,	INP 			// cc = INPUT
+			BSA Putc 		// return cc
+			BUN Getc I 		// }
+//getc data
+hex_,		HEX	5f
+backSpace,	HEX	8
+/////////////////////////////////////
+/////////////////////////////////////
+//void puts(char *str)
+Puts,		HEX	0			// void Puts ( char *str )
+			STA	putsPtr		// {
+			STA	putsStart	//
+putsLoop,	LDA	putsPtr I	//	While( *str )
+			SZA				//	{
+			BUN	putsBody	//		Putc ( *str )
+			BUN	putsEnd		//		++str
+putsBody,	BSA	Putc		//	}
+			ISZ	putsPtr		//
+			BUN	putsLoop	//
+putsEnd,	LDA	putsStart	//
+			BUN	Puts I		// }
+// Puts Data
+putsPtr,	HEX	0
+putsStart,	HEX	0
+/////////////////////////////////////
+/////////////////////////////////////
+//void gets(char *str)
+Gets,		HEX	0			// void Gets ( char *str )
+			STA	getsPtr		// {
+			STA	getsStart	//	char c;
+getsLoop,	BSA	Getc		//	While ( ( c = Getc ) != CR )
+			ADD	Minus_CR	//	{
+			SZA				//		*str = c
+			BUN	getsBody	//		++str
+			BUN	getsEnd		//	}
+getsBody,	ADD	CR			//	*str = 0
+			STA	getsPtr I	//
+			ISZ	getsPtr		//
+			BUN	getsLoop	//
+getsEnd,	STA	getsPtr I	//
+			LDA	getsStart	//
+			BUN	Gets I		// }
+// Gets Data
+getsPtr,	HEX	0
+getsStart,	HEX	0
+CR,			HEX	D
+Minus_CR,	HEX	-D
+/////////////////////////////////////
+/////////////////////////////////////
+// putSignedInt( num *divArray ) 	//
+putSigned,	HEX 0 					// void putSignedInt( num *divArray )
+			SNA 					// {
+			BUN putSI_Pos 			// if(num < 0)
+putSI_Neg,	CMA // putc( - ) 		// {
+			INC 					// num = -num
+			STA putSInum 			// }
+			LDA NegSign 			//
+			BSA Putc 				//
+			BUN putSI_cont			//
+putSI_Pos,	STA putSInum 			//
+putSI_cont, CLA 					//
+			STA putSI_Flag 			// Flag = 0
+			BSA Pop_AC 				// int *tmpP = divArray
+			STA tmpP 				//
+putSI_Loop, LDA tmpP I 				// While ( *tmpP != 0 )
+			SZA 					// {
+			BUN putSI_Body 			// 
+			BUN putSI_End 			//
+putSI_Body, CLA						//
+			STA	putSI_Dig			//
+			LDA	putSInum			//
+putDivLoop,	ADD	tmpP I				//	dig = num / *tmpP
+			SNA						//	num = num % *tmpP
+			BUN	putDivBody			//	( divison using substraction,
+			BUN	putDivEnd			//	  since its faster in the case of printing numbers)
+putDivBody,	STA	putSInum			//
+			ISZ	putSI_Dig			//
+			BUN	putDivLoop			//
+putDivEnd,	LDA putSI_Flag 			//
+			SZA 					// if(flag == 0) // to skip initial 0's
+			BUN putSI_prnt 			// { if ( dig != 0 )
+			LDA putSI_Dig 			// { flag = dig
+			SZA 					// goto prnt
+			BUN notzeroDig 			// }
+			BUN zeroDig 			//
+notzeroDig, STA putSI_Flag 			// goto noprnt
+			BUN putSI_prnt 			// }
+zeroDig, 	BUN putSI_noprnt 		//
+putSI_prnt, LDA putSI_Dig 			// 
+			CMA
+			INC
+			ADD	TEN
+			SPA
+			BUN	prntAF1
+			BUN	prnt091
+prntAF1,	LDA	bigA				// if ( Digit is 10 to 15)
+			ADD	TEN					// then	Digit = Digit - 10 + 'A'
+			CMA
+			INC
+			ADD	putSI_Dig
+			BUN	prnt1
+prnt091,	LDA	putSI_Dig			// if ( Digit is 0 to 9)
+			ADD Digit_HEX			// then	Digit = Digit + '0'
+prnt1,		BSA Putc				//	prnt, putc ( Digit )
+putSI_noprnt,	ISZ tmpP 			// noprnt tmpP++
+			BUN putSI_Loop 			//
+putSI_End, 	LDA putSInum 			// }
+			CMA
+			INC
+			ADD	TEN
+			SPA
+			BUN	prntAF2
+			BUN	prnt092
+prntAF2,	LDA	bigA				// check if num shuold be 'A'-'F' or '0'-'9'
+			ADD	TEN					//	same as dig
+			CMA
+			INC
+			ADD	putSInum
+			BUN	prnt2
+prnt092,	LDA	putSInum
+			ADD Digit_HEX 			// putc ( num )
+prnt2,		BSA Putc 				//
+			BUN putSigned I 		// }
+//putSignedInt DATA
+Digit_HEX, 	HEX 30
+tmpP, 		HEX 0
+putSInum, 	DEC 0
+NegSign, 	HEX 2d
+putSI_Flag, DEC 0
+putSI_Dig, 	DEC 0
+/////////////////////////////////////
+/////////////////////////////////////
+//getSignedInt(getFunction *)
+getSI, 		HEX 0 				// getSignedInt(getFunction *getFunc)
+			STA	getFunc
+			BSA Getc 			// {
+			STA getSI_Sign 		// char sign = getc
+			CMA 				//
+			INC 				//
+			ADD NegSign 		// if ( sign == - )
+			SZA 				// {
+			BUN SI_Else 		// num = -(*getFunc())
+			BSA	Getc
+			BSA getFunc	I 		// 
+            CMA 				//
+			INC 				//
+            SPA
+            BUN getSI_End		//	check over/undeflow
+            BUN ouf				// }
+SI_Else, 	LDA getSI_Sign 		// else if ( sign == + )
+			ADD PosSign 		// {
+			SZA 				// num = *getFunc()
+			BUN SI_Else2 		// 
+			BSA	Getc			//	check over/undeflow
+			BSA getFunc	I 		//	return num
+			BUN posPos 			//
+SI_Else2, 	LDA getSI_Sign 		// }
+			BSA getFunc	I 		//
+posPos,     SNA					//
+            BUN getSI_End		//
+            BUN ouf				//
+getSI_End, 	BUN getSI I 		// return *getFunc() }
+//getSI DATA
+getSI_Sign, HEX 0
+PosSign, 	HEX -2b
+getFunc,	HEX	0
+/////////////////////////////////////
+/////////////////////////////////////
+//print Error: "x" is not a digit!
+digError,   STA digErrX
+            LDA CR
+            BSA Putc
+            LDA ErrorStart
+            BSA Puts
+            LDA digErrX
+            BSA Putc
+            LDA Space
+            BSA Putc
+            LDA nDigStart
+            BSA Puts
+            BUN mainLoop
+//digError data
+digErrX,    HEX 0
+/////////////////////////////////////
+/////////////////////////////////////
+//print Error: Over/Undeflow!
+ouf,        LDA CR
+            BSA Putc
+			LDA ErrorStart
+            BSA Puts
+            LDA oufStart
+            BSA Puts
+            BUN mainLoop
+/////////////////////////////////////
+/////////////////////////////////////
+structerStart,	HEX	600
+				ORG	600
+structer,		HEX 3e  //>
+                HEX 20  // 
+                HEX 42  //B
+                HEX 61  //a
+                HEX 73  //s
+                HEX 65  //e
+                HEX 3a  //:
+                HEX 20  //
+                HEX 28  //(
+                HEX 42  //B
+                HEX 2f  ///
+                HEX 44  //D
+                HEX 2f  ///
+                HEX 48  //H
+                HEX 29  //)
+                HEX d   //
+                HEX 3e  //>
+                HEX 20  //
+                HEX 3c  //<
+                HEX 4e  //N
+                HEX 75  //u
+                HEX 6d  //m
+                HEX 62  //b
+                HEX 65  //e
+                HEX 72  //r
+                HEX 3e  //>
+                HEX 3c  //<
+                HEX 4f  //O
+                HEX 70  //p
+                HEX 65  //e
+                HEX 72  //r
+                HEX 61  //a
+                HEX 74  //t
+                HEX 6f  //o
+                HEX 72  //r
+                HEX 3e  //>
+                HEX 3c  //<
+                HEX 4e  //N
+                HEX 75  //u
+                HEX 6d  //m
+                HEX 62  //b
+                HEX 65  //e
+                HEX 72  //r
+                HEX 3e  //>
+                HEX 3d  //=
+				HEX	d
+                HEX 0
+/////////////////////////////////////
+/////////////////////////////////////
+//check A - F				// return ('A' <= dig <= 'F')
+checkAF,    HEX 0
+            STA checkDigAF
+checkAF1,   ADD bigA
+            SNA             // skip if (dig - bigA < 0) -> (dig < 'A') == !(dig >= 'A')
+            BUN checkAF2
+            BUN notAF
+checkAF2,   LDA checkDigAF
+            ADD bigF        // skip if (dig - bigF > 0) -> (dig > 'F') == !(dig <= 'F')
+            SPA
+            BUN isAF
+notAF,      CLA
+            BUN checkAFEnd
+isAF,       LDA checkDigAF
+checkAFEnd, BUN checkAF I
+//checkAF data
+checkDigAF,	HEX 0
+/////////////////////////////////////
+/////////////////////////////////////
+//check 0 - 1					// return ('0' <= dig <= '1')
+check01,    HEX 0
+            STA checkDig01
+check011,   ADD hex0
+            SNA             	// skip if (dig - hex0 < 0) -> (dig < '0') == !(dig >= '0)
+            BUN check012
+            BUN not01
+check012,   ADD Minus1        	// skip if (dig - hex9 > 0) -> (dig > '9') == !(dig <= '9')
+            SPA
+            BUN is01
+not01,      CLA
+            BUN check01End
+is01,       LDA checkDig01
+check01End, BUN check01 I
+//check01 data
+checkDig01, HEX 0
+/////////////////////////////////////
+/////////////////////////////////////
+//pointers to get HEX/BIN/DEC functions
+getHEXptr,	HEX	A00
+getBINptr,	HEX	B00
+getDECptr,	HEX	C00
+baseTXTptr,	HEX	D00
+noBasePtr,	HEX	D10
+Power10start,	HEX D20
+Power16start,	HEX	D25
+Power2start,	HEX	D29
+/////////////////////////////////////
+/////////////////////////////////////
+			ORG	A00
+//getHEX(int num = 0)			// get HEX number
+GetHEX, 	HEX 0				
+			STA	NumHEX			// num = 0
+			SZA	
+			BUN	getHEXCheck
+			BUN	WhileHEX
+getHEXCheck,BSA	checkAF
+			SZA
+			BUN	getHEXpre
+			LDA	NumHEX
+			BSA	check09
+			SZA
+			BUN	getHEXpre
+			LDA	NumHEX
+			BUN	digError
+getHEXpre,	ADD	bigA			// while (isHEX(c=getc())==TRUE)
+			SNA					//		num += num*16 + ( '0'<=c<='9' ? c-'0' : c+10-'A' )
+			BUN	AF0
+			BUN	AF1
+AF0,		ADD	TEN
+			BUN	AF2
+AF1,		LDA	NumHEX
+			ADD	Minus_Dig
+AF2,		STA	NumHEX
+WhileHEX, 	BSA Getc
+			STA CHEX
+			BSA	checkAF
+			SZA
+			BUN	BodyHEX
+			LDA	CHEX
+			BSA	check09
+			SZA
+			BUN	BodyHEX
+			LDA	CHEX
+			BSA	Push_AC
+			BUN	GetHEX_End
+BodyHEX, 	LDA CHEX
+			ADD	bigA
+			SNA
+			BUN	AF3
+			BUN	AF4
+AF3,		ADD	TEN
+			BUN	AF5
+AF4,		LDA	CHEX
+            ADD Minus_Dig
+AF5,		STA CHEX
+            CLE
+			LDA NumHEX 			// this is num *= 16 , using 4xCIL 
+			CIL					//	(while checking for over/underflow)
+			SZE
+            BUN ouf
+			CIL
+			SZE
+            BUN ouf
+			CIL
+			SZE
+            BUN ouf
+			CIL
+			SZE
+            BUN ouf
+			ADD CHEX
+			STA NumHEX
+            SZE
+            BUN ouf				// check for over/underflow while inputing
+			BUN WhileHEX
+GetHEX_End, LDA NumHEX			// return num
+			BUN GetHEX I 		// }
+// GetHEX Data
+NumHEX, 	DEC 0
+CHEX, 		DEC 0
+TEN,		DEC	10
+/////////////////////////////////////
+/////////////////////////////////////
+			ORG	B00
+//getBIN(int num = 0)			// same as getHEX, but for BIN, using num = num*2 + c-'0'
+GetBIN, 	HEX 0				//		while checking for over/undeflow
+			STA	NumBIN
+			SZA
+			BUN	getBINCheck
+			BUN	WhileBIN
+getBINCheck,BSA	check01
+			SZA
+			BUN	getBINpre
+			LDA	NumBIN
+			BUN	digError
+getBINpre,	ADD	Minus_Dig
+			STA	NumBIN
+WhileBIN, 	BSA Getc
+			STA CBIN
+			BSA	check01
+			SZA
+			BUN	BodyBIN
+			LDA	CBIN
+			BSA	Push_AC
+			BUN GetBIN_End 
+BodyBIN, 	LDA CBIN
+            ADD Minus_Dig
+            STA CBIN
+            CLE 
+			LDA NumBIN 			// Num = Num*2
+			CIL
+			SZE
+            BUN ouf
+			ADD CBIN
+			STA NumBIN 
+            SZE
+            BUN ouf
+			BUN WhileBIN 
+GetBIN_End, LDA NumBIN
+			BUN GetBIN I 
+// GetBIN Data
+NumBIN, 	DEC 0
+CBIN, 		DEC 0
+/////////////////////////////////////
+/////////////////////////////////////
+			ORG	C00
+//unsigned short int getUnsignedInt(int num = 0)
+GetUS, 		HEX 0 				// getDEC same as getHEX but num = num*10 + c-'0'
+			STA	Num				/	while checking for over/underflow
+			SZA
+			BUN	getUSCheck
+			BUN	WhileUS
+getUSCheck,	BSA	check09
+			SZA
+			BUN	WhileUSpre
+			LDA	Num
+			BUN	digError
+WhileUSpre,	ADD	Minus_Dig
+			STA	Num
+WhileUS, 	BSA Getc 
+			STA C 
+			BSA	check09
+			SZA
+			BUN	BodyUS
+			LDA	C
+			BSA	Push_AC
+			BUN GetUS_End 
+BodyUS, 	LDA C
+            ADD Minus_Dig
+            STA C
+            CLE 	
+			LDA Num 		// Num = Num*10
+			CIL 
+			SZE
+            BUN ouf
+			CIL 
+			SZE
+            BUN ouf
+			CIL 
+			SZE
+            BUN ouf
+			ADD Num 
+			SZE
+            BUN ouf
+			ADD Num 
+			SZE
+            BUN ouf
+			ADD C
+			STA Num 
+            SZE
+            BUN ouf
+			BUN WhileUS
+GetUS_End, 	LDA Num
+			BUN GetUS I 
+// GetUS Data
+Num, 		DEC 0
+C, 			DEC 0
+Minus_Dig, 	HEX -30
+/////////////////////////////////////
+/////////////////////////////////////
+				ORG	D00
+baseTXT,		HEX 42  //B
+                HEX 61  //a
+                HEX 73  //s
+                HEX 65  //e
+                HEX 3a  //:
+                HEX 20  //
+                HEX 0
+				ORG	D10
+noBaseTXT,		HEX 6e  //n
+                HEX 6f  //o
+                HEX 20  //
+                HEX 73  //s
+                HEX 75  //u
+                HEX 63  //c
+                HEX 68  //h
+                HEX 20  //
+                HEX 62  //b
+                HEX 61  //a
+                HEX 73  //s
+                HEX 65  //e
+                HEX 21  //!
+                HEX d   //
+                HEX 0
+			ORG D20
+Power10, 	DEC -10000
+			DEC -1000
+			DEC -100
+			DEC -10
+			DEC 0
+Power16,	HEX	-1000
+			HEX	-100
+			HEX	-10
+			HEX	0
+Power2,		HEX	-4000
+			HEX	-2000
+			HEX	-1000
+			HEX	-800
+			HEX	-400
+			HEX	-200
+			HEX	-100
+			HEX	-80
+			HEX	-40
+			HEX	-20
+			HEX	-10
+			HEX	-8
+			HEX	-4
+			HEX	-2
+			HEX	0
